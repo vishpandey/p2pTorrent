@@ -340,7 +340,7 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     while(totalSize > 0) {
 
     	sem_wait(&shareListSeederMutex);
-    	cout << "taken mutex on share list" << endl;
+    	//cout << "taken mutex on share list" << endl;
     	auto shareEntityIter = shareListSeeder.find(shareId);
 
 		auto mutexIter = sharesMutex.find(shareId);
@@ -351,17 +351,17 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
 
 		pair<sem_t, bool> seederMutex = mutexIter->second;
     	sem_wait(&seederMutex.first);
-    	cout << "taking mutex on seederMutex" << endl;
+    	//cout << "taking mutex on seederMutex" << endl;
     	if(seederMutex.second) {	
-    		cout << "mutex boolean is true" << endl;
+    		//cout << "mutex boolean is true" << endl;
     		sem_post(&seederMutex.first);
     		sem_post(&shareListSeederMutex);
     		break;
     	}
 		sem_post(&seederMutex.first);
-		cout << "releasing mutex on seedermutex" << endl;
+		//cout << "releasing mutex on seedermutex" << endl;
     	sem_post(&shareListSeederMutex);
-    	cout << "releasing mutex on share list" << endl;
+    	//cout << "releasing mutex on share list" << endl;
 
     	currChunkSize = CHUNK_SIZE;
     	if(totalSize < CHUNK_SIZE) {
@@ -383,7 +383,7 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     if(totalSize == 0) {
     	shareEntity.setStatus(1);
     }
-    cout << "total Size is not 0" << endl;
+    cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
 
     close(seederSocket);
