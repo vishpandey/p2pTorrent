@@ -819,7 +819,7 @@ void initiateBlockingPingCall(string ipAddress, string port, string seederUuid) 
 
 		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		    printf("\n Socket creation error \n");
-	        return;
+	        continue;
 	    }
 	   
 	    serv_addr.sin_family = AF_INET;
@@ -827,7 +827,7 @@ void initiateBlockingPingCall(string ipAddress, string port, string seederUuid) 
 	    
 	    if(inet_pton(AF_INET, ipAddress.c_str(), &serv_addr.sin_addr)<=0) {
 	        printf("\nInvalid address/ Address not supported \n");
-	        return;
+	        continue;
 	    }
 
 		if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
@@ -836,7 +836,7 @@ void initiateBlockingPingCall(string ipAddress, string port, string seederUuid) 
 	    }
 		if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
 	        printf("\nConnection Failed \n");
-	        return;
+	        continue;
 	    }
 
 	    string request = "ping$" + seederUuid;
