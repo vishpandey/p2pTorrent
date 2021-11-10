@@ -317,7 +317,7 @@ bool createMTorrentFile(string filename, string path) {
 }
 
 void sendFileContent(string filename, string groupId, string shareId, void *new_socket) {
-	cout << "intializing file transfer process" << endl;
+	//cout << "intializing file transfer process" << endl;
 
 	auto shareEntityIter = shareListSeeder.find(shareId);
 
@@ -381,7 +381,7 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
 }
 
 void sendHashFileData(string filename, int new_socket) {
-	cout << "retrieving hash of file" << endl;
+	//cout << "retrieving hash of file" << endl;
 
 	string mTorrentFilename = "uploads/" + filename + ".mtorrent";
 
@@ -519,7 +519,7 @@ void seederService(pair<string, int> myIpAddress) {
 			send(new_socket, responseStub, strlen(responseStub), 0);
 
  		} else if(tokens[0] == "new_download") {
- 			cout << "got download request from one of the clients" << endl;
+ 			//cout << "got download request from one of the clients" << endl;
  			
  			string filename = tokens[1];
  			string groupId = tokens[2];
@@ -766,7 +766,7 @@ receiveFileChunkFromReceiver:
         n = read(sock, buffer, CHUNK_SIZE);
         destFile.write(buffer, n);
         numOfChunksReceived++;
-        cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
+        //cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
     } while (n > 0);
 
     if(numOfChunksReceived < numOfChunksToReceive) {
@@ -788,7 +788,7 @@ bool verifySeederFileData(string fileHash, string tempFilename, string filename)
 		return true;
 	}
 
-	cout << "file hash do not match" << endl;
+	//cout << "file hash do not match" << endl;
 	return false;
 }
 
@@ -803,7 +803,7 @@ void transferDataFromTempToOriginalFile(string tempFile, string destFile) {
             out_file << line << "\n";
         }
  
-        cout << "Copy Finished \n";
+        //cout << "Copy Finished \n";
  
     } else {
         printf("Cannot read File");
@@ -854,8 +854,8 @@ void initializeDownload(string uuid, string ipAddress, string port,
     int totalFileSize = stoi(tokens[0]);
     int numOfChunksToReceive = stoi(tokens[1]);
 
-    cout << "total filesize " << totalFileSize << endl;
-    cout << "num of chunks in total " << numOfChunksToReceive << endl;
+    // cout << "total filesize " << totalFileSize << endl;
+    // cout << "num of chunks in total " << numOfChunksToReceive << endl;
 	
     request = "new_file_hash";
 	request += "$" + filename + "$" + groupId + "$" + downloadId + "$" + uuid;
@@ -951,7 +951,7 @@ void sendRequestToTracker(vector<string> command,
 						vector<pair<string, int>> trackerAddress,
 						int sock, struct sockaddr_in serv_addr) {
 
-	cout << "sending user request to tracker" << endl;
+	//cout << "sending user request to tracker" << endl;
 	int responseStatus;
 	string stub = createStubFromUserInput(command);
 	char *requestStub = new char[stub.length() + 1];
