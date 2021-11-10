@@ -727,7 +727,8 @@ void initiateBlockingPingCall(string ipAddress, string port, string seederUuid) 
 }
 
 void writeSeederFileData(string ipAddress, string port, string request, 
-							string tempFilename, int totalFileSize, int numOfChunksToReceive,
+							string tempFilename, long long int totalFileSize, 
+							long long int numOfChunksToReceive,
 							string seederUuid) {
 	int sock;
 	struct sockaddr_in serv_addr;
@@ -758,7 +759,8 @@ void writeSeederFileData(string ipAddress, string port, string request,
     char *destPath = new char[tempFilename.length() + 1];
     strcpy(destPath, tempFilename.c_str());
     ofstream destFile(destPath, ofstream::binary);
-    int n, numOfChunksReceived = 0, totalSizeReceived = 0;
+    int n;
+    long long int numOfChunksReceived = 0, totalSizeReceived = 0;
 
 receiveFileChunkFromReceiver:
     do
@@ -853,8 +855,8 @@ void initializeDownload(string uuid, string ipAddress, string port,
 
     vector<string> tokens = processString(fileStatDetails, '$');
 
-    int totalFileSize = stoi(tokens[0]);
-    int numOfChunksToReceive = stoi(tokens[1]);
+    int totalFileSize = stoll(tokens[0]);
+    int numOfChunksToReceive = stoll(tokens[1]);
 
     cout << "total filesize " << totalFileSize << endl;
     cout << "num of chunks in total " << numOfChunksToReceive << endl;
