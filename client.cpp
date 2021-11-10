@@ -766,7 +766,7 @@ receiveFileChunkFromReceiver:
         n = read(sock, buffer, CHUNK_SIZE);
         destFile.write(buffer, n);
         numOfChunksReceived++;
-        //cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
+        cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
     } while (n > 0);
 
     if(numOfChunksReceived < numOfChunksToReceive) {
