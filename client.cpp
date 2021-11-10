@@ -390,6 +390,89 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     seederFile.close();
 }
 
+void reSendFileContent(string filename, string groupId, string shareId, void *new_socket) {
+	cout << "re-intializing file transfer process" << endl;
+	string filePath = "uploads/" + filename;
+	string mTorrentFilename = filename + ".mtorrent";
+	int seederSocket = *(int *)new_socket;
+	
+	struct stat seedFileStat;
+    if (stat(filePath.c_str(), &seedFileStat) == -1) {
+        cout << "FILE NOT FOUND" << endl;
+        return;
+    }
+
+    char *fpath = new char[filePath.length() + 1];
+    strcpy(fpath, filePath.c_str());
+
+    ifstream seederFile(fpath, ifstream::binary);
+
+	long int totalSize = seedFileStat.st_size;
+    long int currChunkSize;
+
+    sem_wait(&shareListSeederMutex);
+    auto shareEntityIter = shareListSeeder.find(shareId);
+    Shares shareEntity = shareEntityIter->second;
+    long long int chunksAlreadySent = shareEntity.getChunksAlreadySent();
+    sem_post(&shareListSeederMutex);
+    long long int currChunkNum = 0;
+    while(totalSize > 0) {
+    	sem_wait(&shareListSeederMutex);
+    	//cout << "taken mutex on share list" << endl;
+    	auto shareEntityIter = shareListSeeder.find(shareId);
+
+		auto mutexIter = sharesMutex.find(shareId);
+
+		if(mutexIter == sharesMutex.end()) {
+			break;
+		}
+
+		pair<sem_t, bool> seederMutex = mutexIter->second;
+    	sem_wait(&seederMutex.first);
+    	//cout << "taking mutex on seederMutex" << endl;
+    	if(seederMutex.second) {	
+    		//cout << "mutex boolean is true" << endl;
+    		sem_post(&seederMutex.first);
+    		sem_post(&shareListSeederMutex);
+    		break;
+    	}
+		sem_post(&seederMutex.first);
+		//cout << "releasing mutex on seedermutex" << endl;
+    	sem_post(&shareListSeederMutex);
+    	//cout << "releasing mutex on share list" << endl;
+
+    	currChunkSize = CHUNK_SIZE;
+    	if(totalSize < CHUNK_SIZE) {
+    		currChunkSize = totalSize;    		
+    	}
+		char *chunkData = new char[currChunkSize];
+		if(currChunkNum < chunksAlreadySent) {
+			seederFile.read(chunkData, currChunkSize);
+			currChunkNum++;
+    		continue;
+    	}
+
+		send(seederSocket, chunkData, currChunkSize, 0);
+		
+		totalSize = totalSize - currChunkSize;
+
+		currChunkNum++;
+		chunksAlreadySent++;
+    }
+
+    shareEntityIter = shareListSeeder.find(shareId);
+    shareEntity = shareEntityIter->second;
+    shareEntity.setChunksAlreadySent(chunksAlreadySent);
+    if(totalSize == 0) {
+    	shareEntity.setStatus(1);
+    }
+    cout << "total Size is not 0, download stopped" << endl;
+    cout << "stopping download" << endl;
+
+    close(seederSocket);
+    seederFile.close();
+}
+
 void sendHashFileData(string filename, int new_socket) {
 	//cout << "retrieving hash of file" << endl;
 
@@ -565,6 +648,45 @@ void seederService(pair<string, int> myIpAddress) {
  			}
 
  			sendHashFileData(tokens[1], new_socket);
+ 		} else if (tokens[0] == "resume_download") {
+ 			cout << "got request to resume download" << endl;
+
+ 			string filename = tokens[1];
+ 			string groupId = tokens[2];
+ 			string shareId = tokens[3];
+ 			string seederUuid = tokens[4];
+
+ 			if(seederUuid != loggedInUuid) {
+ 				sendSeederOfflineMessageToClient(new_socket);
+ 				continue;
+ 			}
+ 			
+ 			sem_wait(&shareListSeederMutex);
+
+ 			auto shareMutexIter = sharesMutex.find(shareId);
+
+ 			if(shareMutexIter == sharesMutex.end()) {
+ 				cout << "download could not be resumed" << endl;
+ 				continue;
+ 			}
+
+ 			pair<sem_t, bool> seederDownloadMutex = shareMutexIter->second;
+ 			
+ 			sem_wait(&seederDownloadMutex.first);
+
+ 			seederDownloadMutex.second = false;
+
+ 			sem_post(&seederDownloadMutex.first);
+
+ 			shareMutexIter->second = seederDownloadMutex;
+
+ 			sem_post(&shareListSeederMutex);
+
+ 			thread reSendFileContentThread(&reSendFileContent, filename, groupId,
+ 										shareId,
+ 										(void *)&new_socket);
+ 			
+ 			reSendFileContentThread.detach();
  		}
 	}
 
@@ -670,10 +792,6 @@ bool getPingResponse(string ipAddress, string port, string seederUuid) {
         printf("\nConnection Failed \n");
         return false;
     }
-	if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        printf("\nConnection Failed \n");
-        return false;
-    }
 
     string request = "ping$" + seederUuid;
 
@@ -694,7 +812,7 @@ bool getPingResponse(string ipAddress, string port, string seederUuid) {
 }
 
 void initiateBlockingPingCall(string ipAddress, string port, string seederUuid) {
-	cout << "starting blocking ping call" << endl;
+	cout << "starting blocking ping call for uuid " << seederUuid << endl;
 	while(true) {
 		int sock;
 		struct sockaddr_in serv_addr;
@@ -741,9 +859,15 @@ void initiateBlockingPingCall(string ipAddress, string port, string seederUuid) 
 }
 
 void writeSeederFileData(string ipAddress, string port, string request, 
-							string tempFilename, long long int totalFileSize, 
+							string tempFilename, 
+							long long int totalFileSize, 
 							long long int numOfChunksToReceive,
-							string seederUuid) {
+							string seederUuid, 
+							string filename, 
+							string groupId, 
+							string downloadId) {
+	
+	cout << "got " << request << " request" << endl;
 	int sock;
 	struct sockaddr_in serv_addr;
 
@@ -765,6 +889,7 @@ void writeSeederFileData(string ipAddress, string port, string request,
         return;
     }
 	
+	request += "$" + filename + "$" + groupId + "$" + downloadId + "$" + seederUuid;
 	char *requestStub = new char[request.length() + 1];
 	strcpy(requestStub, request.c_str());
 	
@@ -776,7 +901,6 @@ void writeSeederFileData(string ipAddress, string port, string request,
     int n;
     long long int numOfChunksReceived = 0, totalSizeReceived = 0;
 
-receiveFileChunkFromReceiver:
     do
     {
         char *buffer = new char[CHUNK_SIZE];
@@ -787,15 +911,25 @@ receiveFileChunkFromReceiver:
     } while (n > 0);
 
     if(numOfChunksReceived < numOfChunksToReceive) {
+		destFile.close();
+		close(sock);
     	if (!getPingResponse(ipAddress, port, seederUuid)) {
     		initiateBlockingPingCall(ipAddress, port, seederUuid);
-    		goto receiveFileChunkFromReceiver;
+    		cout << "exiting blocking ping call" << endl;
+    		numOfChunksToReceive = numOfChunksToReceive - numOfChunksReceived;
+    		request = "resume_download";
+    		writeSeederFileData(ipAddress, port, request, tempFilename, totalFileSize,
+    			numOfChunksToReceive, seederUuid, filename, groupId, downloadId);
+
+    		return;
     	}
     }
 
     destFile.close();
 
 	close(sock);
+
+	return;
 }
 
 bool verifySeederFileData(string fileHash, string tempFilename, string filename) {
@@ -883,10 +1017,10 @@ void initializeDownload(string uuid, string ipAddress, string port,
     downloadsListLeecher.push_back(Downloads(downloadId, groupId, filename, 0, loggedInUuid, uuid));
 
     request = "new_download";
-	request += "$" + filename + "$" + groupId + "$" + downloadId + "$" + uuid;
 	
 	writeSeederFileData(ipAddress, port, request, tempFilename, 
-						totalFileSize, numOfChunksToReceive, uuid);
+						totalFileSize, numOfChunksToReceive, uuid, 
+						filename, groupId, downloadId);
 
 	if (verifySeederFileData(seederFileHashFromServer, tempFilename, filename)) {
 		changeDownloadStatus(groupId, filename, 1);
