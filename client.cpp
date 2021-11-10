@@ -377,9 +377,12 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
 		chunksAlreadySent++;
     }
 
+    sem_wait(&shareListSeederMutex);
     auto shareEntityIter = shareListSeeder.find(shareId);
     Shares shareEntity = shareEntityIter->second;
     shareEntity.setChunksAlreadySent(chunksAlreadySent);
+    shareEntityIter->second = shareEntity;
+    sem_post(&shareListSeederMutex);
     if(totalSize <= 0) {
     	cout << "Download complete" << endl;
     	shareEntity.setStatus(1);
@@ -464,9 +467,12 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
 		chunksAlreadySent++;
     }
 
+    sem_wait(&shareListSeederMutex);
     shareEntityIter = shareListSeeder.find(shareId);
     shareEntity = shareEntityIter->second;
     shareEntity.setChunksAlreadySent(chunksAlreadySent);
+    shareEntityIter->second = shareEntity;
+    sem_post(&shareListSeederMutex);
     if(totalSize <= 0) {
     	cout << "Download complete" << endl;
     	shareEntity.setStatus(1);
@@ -936,13 +942,13 @@ void writeSeederFileData(string ipAddress, string port, string request,
 }
 
 bool verifySeederFileData(string fileHash, string tempFilename, string filename) {
-
+	cout << "verifying seed file hash" << endl;
 	string tempFileHash = filename + "\n" + genFileHash(tempFilename) + "\n";
 	if(tempFileHash == fileHash) {
 		return true;
 	}
 
-	//cout << "file hash do not match" << endl;
+	cout << "file hash do not match" << endl;
 	return false;
 }
 
