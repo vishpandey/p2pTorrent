@@ -680,6 +680,7 @@ bool getPingResponse(string ipAddress, string port, string seederUuid) {
 }
 
 void initiateBlockingPingCall(string ipAddress, string port, string seederUuid) {
+	cout << "starting blocking ping call" << endl;
 	while(true) {
 		int sock;
 		struct sockaddr_in serv_addr;
@@ -848,18 +849,20 @@ void initializeDownload(string uuid, string ipAddress, string port,
 
 	string request = "stat$" + filename + "$" + groupId + "$" + downloadId + "$" + uuid;
     string fileStatDetails = fetchFileDetailsFromSeeder(ipAddress, port, request);
+    cout << "received file details" << endl;
 
     vector<string> tokens = processString(fileStatDetails, '$');
 
     int totalFileSize = stoi(tokens[0]);
     int numOfChunksToReceive = stoi(tokens[1]);
 
-    // cout << "total filesize " << totalFileSize << endl;
-    // cout << "num of chunks in total " << numOfChunksToReceive << endl;
+    cout << "total filesize " << totalFileSize << endl;
+    cout << "num of chunks in total " << numOfChunksToReceive << endl;
 	
     request = "new_file_hash";
 	request += "$" + filename + "$" + groupId + "$" + downloadId + "$" + uuid;
 	string seederFileHashFromServer = fetchHashValueFromSeeder(ipAddress, port, request);
+	cout << "received file hash details" << endl;
 
     downloadsListLeecher.push_back(Downloads(downloadId, groupId, filename, 0, loggedInUuid, uuid));
 
@@ -1068,8 +1071,8 @@ int main(int argc, char *argv[]) {
 												trackerAddress,
 												sock2, serv_addr2);
 			sendLogoutRequestThread.join();
-
 			stopAllShares();
+			loggedInUuid = "";
 		} else if (command[0] == "requests" && command[1] == "list_requests") {
 			command.push_back(loggedInUuid);
 			thread sendListPendingRequestThread(&sendRequestToTracker, command,
@@ -1112,10 +1115,10 @@ int main(int argc, char *argv[]) {
 			displayDownloadsList();
 		} else if(command[0] == "stop_share") {
 			command.push_back(loggedInUuid);
-			thread sendStopShareRequestThread(&sendRequestToTracker, command,
-												trackerAddress,
-												sock2, serv_addr2);
-			sendStopShareRequestThread.join();
+			// thread sendStopShareRequestThread(&sendRequestToTracker, command,
+			// 									trackerAddress,
+			// 									sock2, serv_addr2);
+			// sendStopShareRequestThread.join();
 
 			stopShare(command[1], command[2]);
 		}
