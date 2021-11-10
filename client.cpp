@@ -97,7 +97,7 @@ class Shares {
 	string groupId;
 	string seederUuid;
 	int status;
-	int chunksAlreadySent;
+	long long int chunksAlreadySent;
 public:
 	Shares(string filename, string groupId, string seederUuid, int status) {
 		this->filename = filename;
@@ -123,7 +123,7 @@ public:
 		this->status = status;
 	}
 
-	void setChunksAlreadySent(int chunksAlreadySent) {
+	void setChunksAlreadySent(long long int chunksAlreadySent) {
 		this->chunksAlreadySent = chunksAlreadySent;
 	}
 
@@ -143,7 +143,7 @@ public:
 		return this->seederUuid;
 	}
 
-	int getChunksAlreadySent() {
+	long long int getChunksAlreadySent() {
 		return this->chunksAlreadySent;
 	}
 };
@@ -421,6 +421,7 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     auto shareEntityIter = shareListSeeder.find(shareId);
     Shares shareEntity = shareEntityIter->second;
     long long int chunksAlreadySent = shareEntity.getChunksAlreadySent();
+    cout << "chunks already sent : " << chunksAlreadySent << endl;
     sem_post(&shareListSeederMutex);
     long long int currChunkNum = 0;
     while(totalSize > 0) {
