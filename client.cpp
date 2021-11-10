@@ -932,19 +932,23 @@ void stopAllShares() {
 
 void stopShare(string groupId, string filename) {
 	for (auto itr = shareListSeeder.begin(); itr != shareListSeeder.end(); itr++) {
+		cout << "looking for share entity to stop" << endl;
 		Shares obj = itr->second;
 
 		if(obj.getFilename() == filename && obj.getGroupId() == groupId &&
 			obj.getSeederUuid() == loggedInUuid) {
 
+			cout << "got share entity" << endl;
 			auto mutexIter = sharesMutex.find(itr->first);
 
 			if(mutexIter == sharesMutex.end()) {
 				continue;
 			}
 
+			cout << "got share entity mutex" << endl;
 			pair<sem_t, bool> seederMutex = mutexIter->second;
 			sem_wait(&seederMutex.first);
+			cout << "inside seeder mutex" << endl;
 			seederMutex.second = true;
 			sem_post(&seederMutex.first);
 			mutexIter->second = seederMutex;
