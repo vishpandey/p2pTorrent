@@ -309,7 +309,6 @@ bool createMTorrentFile(string filename, string path) {
     ofstream mTorrentFile(mTorrentFilePath);
 
     string fileHash = genFileHash(filePath);
-    mTorrentFile << filename << endl;
     mTorrentFile << fileHash << endl;
     mTorrentFile.close();
 
@@ -508,8 +507,8 @@ void sendHashFileData(string filename, int new_socket) {
     int lineNum = 0;
     string fileHash = "";
 
-    long int totalSize = torrentFileStat.st_size;
-    long int currChunkSize;
+    long long int totalSize = torrentFileStat.st_size;
+    long long int currChunkSize;
 
     while(totalSize > 0) {
     	currChunkSize = CHUNK_SIZE;
@@ -738,7 +737,7 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 	
 	send(sock, requestStub, strlen(requestStub), 0);
 
-	string seederFileHashFromServer, hashFromTempFile;
+	string seederFileHashFromServer = "";
 	int responseStatus;
 	
 	ifstream srcFd(tempFilePath, ifstream::binary);
@@ -757,28 +756,18 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 		
 		responseStatus = read(sock , responseStub, CHUNK_SIZE);
 		
-		seederFileHashFromServer = string(responseStub);
-		
-		char *chunkData = new char[CHUNK_SIZE];
-		
-		srcFd.read(chunkData, CHUNK_SIZE);
-		
-		hashFromTempFile = chunkHash(chunkData, CHUNK_SIZE);
-
-		if(hashFromTempFile != seederFileHashFromServer) {
-			cout << "actual hash : " << seederFileHashFromServer << endl;
-			cout << "expected hash : " << hashFromTempFile << endl;
-
-			srcFd.close();
-			close(sock);
-
-			return false;
-		}
+		seederFileHashFromServer += string(responseStub);
 	
 	} while (responseStatus > 0);
 
 	srcFd.close();
 	close(sock);
+
+	string fileHashFromTempFile = genFileHash(tempFilePath);
+
+	if(fileHashFromTempFile == seederFileHashFromServer) {
+		return false;
+	}
 
 	return true;
 }
