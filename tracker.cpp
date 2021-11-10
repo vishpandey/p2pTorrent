@@ -96,6 +96,30 @@ public:
 			fileIterator->second = peersList;
 		}
 	}
+
+	set<string> getUsersWithShareableFile(string filename) {
+		auto iter = this->shareableFiles.find(filename);
+		set<string> userList;
+		if(iter != this->shareableFiles.end()) {
+			userList = iter->second;
+		}
+
+		return userList;
+	}
+
+	bool removeUser(string filename, string uuid) {
+		auto fileIterator = this->shareableFiles.find(filename);
+		set<string> peersList;
+		if(fileIterator == this->shareableFiles.end()) {
+			return false;
+		}
+
+		peersList = fileIterator->second;
+		peersList.erase(uuid);
+		fileIterator->second = peersList;
+
+		return true;
+	}
 };
 
 map<string, GroupDetails> groupList;
@@ -209,6 +233,10 @@ void peerService() {
  					strcpy(payload, syncUpData.c_str());
  					send(sock , payload, strlen(payload) , 0);
  				} else if (syncUpCategory == "new_upload") {
+ 					payload[1024] = {0};
+ 					strcpy(payload, syncUpData.c_str());
+ 					send(sock , payload, strlen(payload) , 0);
+ 				} else if (syncUpCategory == "new_stop_share") {
  					payload[1024] = {0};
  					strcpy(payload, syncUpData.c_str());
  					send(sock , payload, strlen(payload) , 0);
@@ -535,6 +563,58 @@ string listFiles(string groupId, string uuid) {
 	return fileListString;
 }
 
+string downloadFile(string groupId, string filename, string destPath, string uuid) {
+
+	auto group = groupList.find(groupId);
+	if(group == groupList.end()) {
+		return "error: group doesnt exist";
+	}
+	GroupDetails groupDetail = group->second;
+
+	if(groupDetail.getOwner() != uuid && !groupDetail.isMember(uuid)) {
+		return "error: user not a part of the group";
+	}
+
+	set<string> usersWithShareableFile = groupDetail.getUsersWithShareableFile(filename);
+	string addressStringWithAllUsers = "";
+	for(auto user = usersWithShareableFile.begin(); user != usersWithShareableFile.end(); user++) {
+		auto userAddress = usersMappingWithIpAddress.find(*user);
+
+		if(currentlyLoggedInUsers.find(userAddress->first) == currentlyLoggedInUsers.end()) {
+			continue;
+		}
+
+		if(addressStringWithAllUsers == "") {
+			addressStringWithAllUsers = userAddress->first + "$" + 
+										userAddress->second.first + "$" +
+										userAddress->second.second;
+			continue;
+		}
+
+		addressStringWithAllUsers = "$" + userAddress->first + "$" + 
+										userAddress->second.first + "$" +
+										userAddress->second.second;
+	}
+
+	return addressStringWithAllUsers;
+}
+
+string removeUserFromShareableFilesList(string groupId, string filename, string uuid) {
+	auto groupDetailIter = groupList.find(groupId);
+
+	if(groupDetailIter == groupList.end()) {
+		return "false";
+	}
+
+	GroupDetails groupDetail = groupDetailIter->second;
+
+	if (!groupDetail.removeUser(filename, uuid)) {
+		return "false";
+	}
+
+	return "true";
+}
+
 char* createResponse(string response) {
 	char *responseStub = new char[response.length() + 1];
 	strcpy(responseStub, response.c_str());
@@ -824,7 +904,38 @@ void trackerService(string trackerIp, int trackerPort) {
  			payload = createResponse(listFilesResponse);
 
  			send(new_socket, payload, strlen(payload), 0);
- 		}
+ 		} else if (tokens[0] == "download_file") {
+ 			if(!authenticateUser(tokens[4])) {
+ 				string errorMessage = "Failed, user not authenticated";
+ 				payload = createResponse(errorMessage);
+ 				send(new_socket, payload, strlen(payload), 0);
+ 				continue;
+ 			}
+
+ 			string downloadFileResponse = downloadFile(tokens[1], tokens[2], tokens[3], 
+ 														tokens[4]);
+  		
+ 			payload = createResponse(downloadFileResponse);
+
+ 			send(new_socket, payload, strlen(payload), 0);
+  		} else if (tokens[0] == "stop_share") {
+  			if(!authenticateUser(tokens[3])) {
+ 				string errorMessage = "Failed, user not authenticated";
+ 				payload = createResponse(errorMessage);
+ 				send(new_socket, payload, strlen(payload), 0);
+ 				continue;
+ 			}
+
+ 			string stopShareResponse = removeUserFromShareableFilesList(tokens[1], 
+ 																		tokens[2], tokens[3]);
+  		
+ 			if(stopShareResponse == "true") {
+ 				sync_up("new_stop_share", tokens[1] + "$" + tokens[2] + "$" + tokens[3]);
+ 			}
+  		} else if (tokens[0] == "new_stop_share") {
+  			string stopShareResponse = removeUserFromShareableFilesList(tokens[1], 
+ 																		tokens[2], tokens[3]);
+  		}
     }
 }
 
