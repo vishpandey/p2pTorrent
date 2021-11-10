@@ -380,8 +380,12 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     auto shareEntityIter = shareListSeeder.find(shareId);
     Shares shareEntity = shareEntityIter->second;
     shareEntity.setChunksAlreadySent(chunksAlreadySent);
-    if(totalSize == 0) {
+    if(totalSize <= 0) {
+    	cout << "Download complete" << endl;
     	shareEntity.setStatus(1);
+    	close(seederSocket);
+    	seederFile.close();
+    	return;
     }
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
@@ -463,8 +467,12 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     shareEntityIter = shareListSeeder.find(shareId);
     shareEntity = shareEntityIter->second;
     shareEntity.setChunksAlreadySent(chunksAlreadySent);
-    if(totalSize == 0) {
+    if(totalSize <= 0) {
+    	cout << "Download complete" << endl;
     	shareEntity.setStatus(1);
+    	close(seederSocket);
+    	seederFile.close();
+    	return;
     }
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
@@ -604,7 +612,7 @@ void seederService(pair<string, int> myIpAddress) {
  			string response = "True";
  			
  			if(tokens[1] != loggedInUuid) {
- 				response += "False";
+ 				response = "False";
  			}
 
  			char *responseStub = new char[response.length() + 1];
@@ -827,16 +835,9 @@ void initiateBlockingPingCall(string ipAddress, string port, string seederUuid) 
 	    
 	    if(inet_pton(AF_INET, ipAddress.c_str(), &serv_addr.sin_addr)<=0) {
 	        printf("\nInvalid address/ Address not supported \n");
-	        continue;
-	    }
-
-		if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-	        printf("\nConnection Failed \n");
-	        return;
 	    }
 		if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
 	        printf("\nConnection Failed \n");
-	        continue;
 	    }
 
 	    string request = "ping$" + seederUuid;
@@ -910,6 +911,8 @@ void writeSeederFileData(string ipAddress, string port, string request,
         cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
     } while (n > 0);
 
+    cout << "numOfChunksReceived : " << numOfChunksReceived << endl;
+    cout << "numOfChunksToReceive : " << numOfChunksToReceive << endl;
     if(numOfChunksReceived < numOfChunksToReceive) {
 		destFile.close();
 		close(sock);
