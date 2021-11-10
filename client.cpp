@@ -149,7 +149,7 @@ public:
 };
 
 vector<Downloads> downloadsListLeecher;
-
+sem_t shareListSeederMutex;
 map<string, Shares> shareListSeeder;
 map<string, pair<sem_t, bool>> sharesMutex;
 
@@ -318,16 +318,6 @@ bool createMTorrentFile(string filename, string path) {
 
 void sendFileContent(string filename, string groupId, string shareId, void *new_socket) {
 	//cout << "intializing file transfer process" << endl;
-
-	auto shareEntityIter = shareListSeeder.find(shareId);
-
-	auto mutexIter = sharesMutex.find(shareId);
-
-	if(mutexIter == sharesMutex.end()) {
-		return;
-	}
-
-	pair<sem_t, bool> seederMutex = mutexIter->second;
 	
 	string filePath = "uploads/" + filename;
 	string mTorrentFilename = filename + ".mtorrent";
@@ -349,12 +339,30 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     long int chunksAlreadySent = 0;
     while(totalSize > 0) {
 
-    	sem_wait(&seederMutex.first);
+    	sem_wait(&shareListSeederMutex);
+    	cout << "taken mutex on share list" << endl;
+    	auto shareEntityIter = shareListSeeder.find(shareId);
 
-    	if(seederMutex.second) {
-    		
+		auto mutexIter = sharesMutex.find(shareId);
+
+		if(mutexIter == sharesMutex.end()) {
+			break;
+		}
+
+		pair<sem_t, bool> seederMutex = mutexIter->second;
+    	sem_wait(&seederMutex.first);
+    	cout << "taking mutex on seederMutex" << endl;
+    	if(seederMutex.second) {	
+    		cout << "mutex boolean is true" << endl;
+    		sem_post(&seederMutex.first);
+    		sem_post(&shareListSeederMutex);
     		break;
     	}
+		sem_post(&seederMutex.first);
+		cout << "releasing mutex on seedermutex" << endl;
+    	sem_post(&shareListSeederMutex);
+    	cout << "releasing mutex on share list" << endl;
+
     	currChunkSize = CHUNK_SIZE;
     	if(totalSize < CHUNK_SIZE) {
     		currChunkSize = totalSize;    		
@@ -367,14 +375,16 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
 		totalSize = totalSize - currChunkSize;
 
 		chunksAlreadySent++;
-		sem_post(&seederMutex.first);
     }
 
+    auto shareEntityIter = shareListSeeder.find(shareId);
     Shares shareEntity = shareEntityIter->second;
     shareEntity.setChunksAlreadySent(chunksAlreadySent);
     if(totalSize == 0) {
     	shareEntity.setStatus(1);
     }
+    cout << "total Size is not 0" << endl;
+    cout << "stopping download" << endl;
 
     close(seederSocket);
     seederFile.close();
@@ -531,6 +541,8 @@ void seederService(pair<string, int> myIpAddress) {
  				continue;
  			}
  			
+ 			sem_wait(&shareListSeederMutex);
+
  			sem_t seederDownloadMutex;
 			sem_init(&seederDownloadMutex, 0, 1);
  			
@@ -538,6 +550,8 @@ void seederService(pair<string, int> myIpAddress) {
 									loggedInUuid, 0)});
  			sharesMutex.insert({shareId, 
  								make_pair(seederDownloadMutex, false)});
+
+ 			sem_post(&shareListSeederMutex);
 
  			thread sendFileContentThread(&sendFileContent, filename, groupId,
  										shareId,
@@ -931,6 +945,7 @@ void stopAllShares() {
 }
 
 void stopShare(string groupId, string filename) {
+	sem_wait(&shareListSeederMutex);
 	for (auto itr = shareListSeeder.begin(); itr != shareListSeeder.end(); itr++) {
 		cout << "looking for share entity to stop" << endl;
 		Shares obj = itr->second;
@@ -942,7 +957,7 @@ void stopShare(string groupId, string filename) {
 			auto mutexIter = sharesMutex.find(itr->first);
 
 			if(mutexIter == sharesMutex.end()) {
-				continue;
+				break;
 			}
 
 			cout << "got share entity mutex" << endl;
@@ -954,6 +969,8 @@ void stopShare(string groupId, string filename) {
 			mutexIter->second = seederMutex;
 		}
 	}
+
+	sem_post(&shareListSeederMutex);
 }
 
 void sendRequestToTracker(vector<string> command, 
@@ -1022,6 +1039,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
+	sem_init(&shareListSeederMutex, 0, 1);
 
 	clientIpAddress = processAddressString(string(argv[1]));
 	vector<pair<string, int>> trackerAddress = readTrackerConfigFile(string(argv[2]));
