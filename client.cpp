@@ -708,13 +708,14 @@ void seederService(pair<string, int> myIpAddress) {
 	close(new_socket);
 }
 
-string fetchHashValueFromSeeder(string ipAddress, string port, string request) {
+bool fetchHashValueFromSeeder(string ipAddress, string port, string request, 
+								string tempFilePath) {
 	int sock;
 	struct sockaddr_in serv_addr;
 
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 	    printf("\n Socket creation error \n");
-        return "False";
+        return false;
     }
    
     serv_addr.sin_family = AF_INET;
@@ -722,12 +723,14 @@ string fetchHashValueFromSeeder(string ipAddress, string port, string request) {
     
     if(inet_pton(AF_INET, ipAddress.c_str(), &serv_addr.sin_addr)<=0) {
         printf("\nInvalid address/ Address not supported \n");
-        return "False";
+        close(sock);
+        return false;
     }
 
 	if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         printf("\nConnection Failed \n");
-        return "False";
+        close(sock);
+        return false;
     }
 	
 	char *requestStub = new char[request.length() + 1];
@@ -735,17 +738,49 @@ string fetchHashValueFromSeeder(string ipAddress, string port, string request) {
 	
 	send(sock, requestStub, strlen(requestStub), 0);
 
-	string seederFileHashFromServer = "";
+	string seederFileHashFromServer, hashFromTempFile;
 	int responseStatus;
+	
+	ifstream srcFd(tempFilePath, ifstream::binary);
+	string fileHash = "";
+    if (!srcFd) {
+        cout << "FILE DOES NOT EXITST : " << string(tempFilePath) << endl;
+        close(sock);
+        return false;
+    }
+
+    // struct stat fileStat;
+    // stat(filepath.c_str(), &fileStat);
+
 	do {
 		char responseStub[CHUNK_SIZE] = {0};
+		
 		responseStatus = read(sock , responseStub, CHUNK_SIZE);
-		seederFileHashFromServer += string(responseStub);
+		
+		seederFileHashFromServer = string(responseStub);
+		
+		char *chunkHash = new char[CHUNK_SIZE];
+		
+		srcFd.read(chunkHash, CHUNK_SIZE);
+		
+		hashFromTempFile = string(chunkHash);
+
+		if(hashFromTempFile != seederFileHashFromServer) {
+			cout << "actual hash : " << seederFileHashFromServer << endl;
+			cout << "expected hash : " << hashFromTempFile << endl;
+
+			srcFd.close();
+			close(sock);
+
+			return false;
+		}
+	
 	} while (responseStatus > 0);
 
+	srcFd.close();
 	close(sock);
 
-	return seederFileHashFromServer;
+	return true;
 }
 
 string fetchFileDetailsFromSeeder(string ipAddress, string port, string request) {
@@ -915,7 +950,7 @@ void writeSeederFileData(string ipAddress, string port, string request,
         n = read(sock, buffer, CHUNK_SIZE);
         destFile.write(buffer, n);
         numOfChunksReceived++;
-        cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
+        //cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
     } while (n > 0);
 
     cout << "numOfChunksReceived : " << numOfChunksReceived << endl;
@@ -1018,11 +1053,6 @@ void initializeDownload(string uuid, string ipAddress, string port,
 
     cout << "total filesize " << totalFileSize << endl;
     cout << "num of chunks in total " << numOfChunksToReceive << endl;
-	
-    request = "new_file_hash";
-	request += "$" + filename + "$" + groupId + "$" + downloadId + "$" + uuid;
-	string seederFileHashFromServer = fetchHashValueFromSeeder(ipAddress, port, request);
-	cout << "received file hash details" << endl;
 
     downloadsListLeecher.push_back(Downloads(downloadId, groupId, filename, 0, loggedInUuid, uuid));
 
@@ -1031,8 +1061,14 @@ void initializeDownload(string uuid, string ipAddress, string port,
 	writeSeederFileData(ipAddress, port, request, tempFilename, 
 						totalFileSize, numOfChunksToReceive, uuid, 
 						filename, groupId, downloadId);
+	
+	request = "new_file_hash";
+	request += "$" + filename + "$" + groupId + "$" + downloadId + "$" + uuid;
+	bool fileHashVerificationStatus = fetchHashValueFromSeeder(ipAddress, port, request, 
+																tempFilename);
+	cout << "received file hash details" << endl;
 
-	if (verifySeederFileData(seederFileHashFromServer, tempFilename, filename)) {
+	if (fileHashVerificationStatus) {
 		changeDownloadStatus(groupId, filename, 1);
 		transferDataFromTempToOriginalFile(tempFilename, destinationFilename);
 		createMTorrentFile(filename, destination);
