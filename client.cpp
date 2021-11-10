@@ -759,11 +759,11 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 		
 		seederFileHashFromServer = string(responseStub);
 		
-		char *chunkHash = new char[CHUNK_SIZE];
+		char *chunkData = new char[CHUNK_SIZE];
 		
-		srcFd.read(chunkHash, CHUNK_SIZE);
+		srcFd.read(chunkData, CHUNK_SIZE);
 		
-		hashFromTempFile = string(chunkHash);
+		hashFromTempFile = chunkHash(chunkData, CHUNK_SIZE);
 
 		if(hashFromTempFile != seederFileHashFromServer) {
 			cout << "actual hash : " << seederFileHashFromServer << endl;
