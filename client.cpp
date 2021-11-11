@@ -339,6 +339,7 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
 	long int totalSize = seedFileStat.st_size;
     long int currChunkSize;
     long int chunksAlreadySent = 0;
+    char *chunkData;
     while(totalSize > 0) {
 
     	sem_wait(&shareListSeederMutex);
@@ -369,7 +370,7 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     	if(totalSize < CHUNK_SIZE) {
     		currChunkSize = totalSize;    		
     	}
-		char *chunkData = new char[currChunkSize];
+		chunkData =(char *) malloc( sizeof(char) * ( currChunkSize + 1 ) );;
 		seederFile.read(chunkData, currChunkSize);
 
 		send(seederSocket, chunkData, currChunkSize, 0);
@@ -377,6 +378,8 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
 		totalSize = totalSize - currChunkSize;
 
 		chunksAlreadySent++;
+
+		free(chunkData);
     }
 
     sem_wait(&shareListSeederMutex);
@@ -490,7 +493,7 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     if(totalSize <= 0) {
     	cout << "Download complete" << endl;
 
-    	string pauseDownload = "$PaUsE$";
+    	string pauseDownload = "$cOmPlEtE$";
 		char *pauseDownloadSignal = new char[pauseDownload.length() + 1];
 		strcpy(pauseDownloadSignal, pauseDownload.c_str());
 		send(seederSocket, pauseDownloadSignal, strlen(pauseDownloadSignal), 0);
@@ -599,7 +602,6 @@ void seederService(pair<string, int> myIpAddress) {
     cout << "seeder service port : " << myIpAddress.second << endl;
 
     while(true) {
-
 	    if ((new_socket = accept(server_fd, (struct sockaddr *)&address,  
 	                       (socklen_t*)&addrlen)) < 0) {
 	        cout << server_fd << endl; 
@@ -652,7 +654,7 @@ void seederService(pair<string, int> myIpAddress) {
 			send(new_socket, responseStub, strlen(responseStub), 0);
 
  		} else if(tokens[0] == "new_download") {
- 			//cout << "got download request from one of the clients" << endl;
+ 			cout << "got download request from one of the clients" << endl;
  			
  			string filename = tokens[1];
  			string groupId = tokens[2];
@@ -1263,6 +1265,7 @@ int main(int argc, char *argv[]) {
 	vector<pair<string, int>> trackerAddress = readTrackerConfigFile(string(argv[2]));
 
 	thread initSeederThread(&seederService, clientIpAddress);
+	initSeederThread.detach();
 
 	while(1) {
 		string cmd;
