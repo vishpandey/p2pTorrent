@@ -315,6 +315,10 @@ bool createMTorrentFile(string filename, string path) {
     return true;
 }
 
+void createMTorrentFileOfTempFile(string tempFilename) {
+	createMTorrentFile(tempFilename, "");
+}
+
 void sendFileContent(string filename, string groupId, string shareId, void *new_socket) {
 	//cout << "intializing file transfer process" << endl;
 	
@@ -737,7 +741,7 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 	
 	send(sock, requestStub, strlen(requestStub), 0);
 
-	string seederFileHashFromServer = "";
+	string seederFileHashFromServer = "", tempTorrentFileHash = "";
 	int responseStatus;
 	
 	ifstream srcFd(tempFilePath, ifstream::binary);
@@ -751,23 +755,31 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
     // struct stat fileStat;
     // stat(filepath.c_str(), &fileStat);
 
+    ifstream mTorrentTempFile(tempFilePath.c_str(), ifstream::binary);
+
 	do {
-		char responseStub[CHUNK_SIZE] = {0};
+		char *responseStub = new char[CHUNK_SIZE];
 		
 		responseStatus = read(sock , responseStub, CHUNK_SIZE);
 		
-		seederFileHashFromServer += string(responseStub);
-	
+		seederFileHashFromServer = string(responseStub);
+
+		char *tempHashChunkData = new char[CHUNK_SIZE];
+		mTorrentTempFile.read(tempHashChunkData, CHUNK_SIZE);
+
+		tempTorrentFileHash = string(tempHashChunkData);
+
+		if(tempTorrentFileHash != seederFileHashFromServer) {
+			cout << "actual hash: " << tempTorrentFileHash << endl;
+			cout << "expected hash : " << seederFileHashFromServer << endl;
+			cout << "hash of chunk did not match" << endl;
+			return false;
+		}
+
 	} while (responseStatus > 0);
 
 	srcFd.close();
 	close(sock);
-
-	string fileHashFromTempFile = genFileHash(tempFilePath);
-
-	if(fileHashFromTempFile == seederFileHashFromServer) {
-		return false;
-	}
 
 	return true;
 }
@@ -1050,6 +1062,9 @@ void initializeDownload(string uuid, string ipAddress, string port,
 	writeSeederFileData(ipAddress, port, request, tempFilename, 
 						totalFileSize, numOfChunksToReceive, uuid, 
 						filename, groupId, downloadId);
+
+	cout << "creating temp mtorrent file" << endl;
+	createMTorrentFileOfTempFile(tempFilename);
 	
 	request = "new_file_hash";
 	request += "$" + filename + "$" + groupId + "$" + downloadId + "$" + uuid;
