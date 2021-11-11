@@ -402,7 +402,7 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     shareEntityIter->second = shareEntity;
     sem_post(&shareListSeederMutex);
 
-    string pauseDownload = "$pause$";
+    string pauseDownload = "$PaUsE$";
 	char *pauseDownloadSignal = new char[pauseDownload.length() + 1];
 	strcpy(pauseDownloadSignal, pauseDownload.c_str());
 	send(seederSocket, pauseDownloadSignal, strlen(pauseDownloadSignal), 0);
@@ -487,14 +487,26 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     shareEntityIter = shareListSeeder.find(shareId);
     shareEntity = shareEntityIter->second;
     shareEntity.setChunksAlreadySent(chunksAlreadySent);
-    shareEntityIter->second = shareEntity;
-    sem_post(&shareListSeederMutex);
     if(totalSize <= 0) {
     	cout << "Download complete" << endl;
+
+    	string pauseDownload = "$PaUsE$";
+		char *pauseDownloadSignal = new char[pauseDownload.length() + 1];
+		strcpy(pauseDownloadSignal, pauseDownload.c_str());
+		send(seederSocket, pauseDownloadSignal, strlen(pauseDownloadSignal), 0);
     	shareEntity.setStatus(1);
     	seederFile.close();
     	return;
     }
+
+    shareEntityIter->second = shareEntity;
+    sem_post(&shareListSeederMutex);
+
+    string pauseDownload = "$PaUsE$";
+	char *pauseDownloadSignal = new char[pauseDownload.length() + 1];
+	strcpy(pauseDownloadSignal, pauseDownload.c_str());
+	send(seederSocket, pauseDownloadSignal, strlen(pauseDownloadSignal), 0);
+
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
     seederFile.close();
