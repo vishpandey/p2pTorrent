@@ -405,6 +405,7 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     shareEntityIter->second = shareEntity;
     sem_post(&shareListSeederMutex);
 
+    cout << "pause download" << endl;
     string pauseDownload = "$PaUsE$";
 	char *pauseDownloadSignal = new char[CHUNK_SIZE + 1];
 	strcpy(pauseDownloadSignal, pauseDownload.c_str());
@@ -460,6 +461,12 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     		//cout << "mutex boolean is true" << endl;
     		sem_post(&seederMutex.first);
     		sem_post(&shareListSeederMutex);
+
+    		string pauseDownload = "$PaUsE$";
+			char *pauseDownloadSignal = new char[pauseDownload.length() + 1];
+			strcpy(pauseDownloadSignal, pauseDownload.c_str());
+			send(seederSocket, pauseDownloadSignal, strlen(pauseDownloadSignal), 0);
+
     		break;
     	}
 		sem_post(&seederMutex.first);
@@ -493,10 +500,10 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     if(totalSize <= 0) {
     	cout << "Download complete" << endl;
 
-    	string pauseDownload = "$cOmPlEtE$";
-		char *pauseDownloadSignal = new char[CHUNK_SIZE + 1];
-		strcpy(pauseDownloadSignal, pauseDownload.c_str());
-		send(seederSocket, pauseDownloadSignal, CHUNK_SIZE, 0);
+    	string completeDownload = "$cOmPlEtE$";
+		char *completeDownloadSignal = new char[CHUNK_SIZE + 1];
+		strcpy(completeDownloadSignal, completeDownload.c_str());
+		send(seederSocket, completeDownloadSignal, strlen(completeDownloadSignal), 0);
     	shareEntity.setStatus(1);
     	seederFile.close();
     	return;
@@ -504,11 +511,6 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
 
     shareEntityIter->second = shareEntity;
     sem_post(&shareListSeederMutex);
-
-    string pauseDownload = "$PaUsE$";
-	char *pauseDownloadSignal = new char[pauseDownload.length() + 1];
-	strcpy(pauseDownloadSignal, pauseDownload.c_str());
-	send(seederSocket, pauseDownloadSignal, strlen(pauseDownloadSignal), 0);
 
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
@@ -988,18 +990,19 @@ void writeSeederFileData(string ipAddress, string port, string request,
     {
         char *buffer = new char[CHUNK_SIZE];
         n = read(sock, buffer, CHUNK_SIZE);
-        destFile.write(buffer, n);
-        numOfChunksReceived++;
 
-        if(strcmp(buffer, "$cOmPlEtE$") == 0) { 
-        	cout << "received pause signal from seeder" << endl; 
+        if(strstr(buffer, "$cOmPlEtE$")) { 
+        	cout << "received complete signal from seeder" << endl; 
         	break;
         }
 
-     	if(strcmp(buffer, "$PaUsE$") == 0) {
+     	if(strstr(buffer, "$PaUsE$")) {
      		cout << "received pause signal from seeder" << endl; 
         	break;
      	}
+
+        destFile.write(buffer, n);
+        numOfChunksReceived++;
         cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
     } while (n > 0);
 
@@ -1241,7 +1244,7 @@ void sendRequestToTracker(vector<string> command,
 
 	char responseStub[1024] = {0};
 	responseStatus = recv(sock , responseStub, 1024, 0);
-	cout << "server returned " << responseStub << endl;
+	//cout << "server returned " << responseStub << endl;
 
 
 	string serverMessage = string(responseStub);
@@ -1262,6 +1265,28 @@ void sendRequestToTracker(vector<string> command,
  		thread sendInitializeDownloadThread(&initializeDownload, uuid, 
  											ipAddress, port, command[1], command[2], command[3]);
  		sendInitializeDownloadThread.detach();
+ 	} else if (command[0] == "create_group" && tokens[0] == "true") {
+ 		cout << "successfully created group" << endl;
+ 	} else if (command[0] == "upload_file" && tokens[0] == "true") {
+ 		cout << "successfully uploaded file" << endl;
+ 	} else if (command[0] == "list_files") {
+ 		if (tokens.size() > 0) {
+ 			for(int i = 0; i < tokens.size(); i++) {
+ 				cout << tokens[i] << endl;
+ 			}
+ 		}
+ 	} else if (command[1] == "list_requests") {
+ 		if (tokens.size() > 0) {
+ 			for(int i = 0; i < tokens.size(); i++) {
+ 				cout << tokens[i] << endl;
+ 			}
+ 		}
+ 	} else if (command[0] == "join_group") {
+ 		if (tokens[0] == "true") {
+ 			cout << tokens[1] << endl;
+ 		} else {
+ 			cout << "failed to sent request to owner" << endl;
+ 		}
  	}
 
  	close(sock);
