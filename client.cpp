@@ -537,6 +537,7 @@ void sendHashFileData(string filename, int new_socket) {
 
     long long int totalSize = torrentFileStat.st_size;
     long long int currChunkSize;
+    char *chunkData;
 
     while(totalSize > 0) {
     	currChunkSize = CHUNK_SIZE;
@@ -544,7 +545,7 @@ void sendHashFileData(string filename, int new_socket) {
     		currChunkSize = totalSize;	
     	}
 
-    	char *chunkData = new char[currChunkSize];
+    	chunkData = (char *)malloc( sizeof(char) * (currChunkSize + 1));
 		mTorrentFile.read(chunkData, currChunkSize);
 
 		send(new_socket, chunkData, currChunkSize, 0);
@@ -552,6 +553,8 @@ void sendHashFileData(string filename, int new_socket) {
 		totalSize = totalSize - currChunkSize;
 		hashNo++;
 		cout << "hash for chunk no " << hashNo << endl;
+
+		free(chunkData);
     }
 
 	mTorrentFile.close();
@@ -783,8 +786,10 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
     tempFilePath += ".mtorrent"; 
     ifstream mTorrentTempFile(tempFilePath.c_str(), ifstream::binary);
 
+    char *responseStub, *tempHashChunkData;
+
 	do {
-		char *responseStub = new char[CHUNK_SIZE];
+		responseStub = (char *)malloc( sizeof(char) * (CHUNK_SIZE + 1));
 		
 		responseStatus = read(sock , responseStub, CHUNK_SIZE);
 		
@@ -793,7 +798,7 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 		
 		seederFileHashFromServer = string(responseStub);
 
-		char *tempHashChunkData = new char[CHUNK_SIZE];
+		tempHashChunkData = (char *)malloc( sizeof(char) * (CHUNK_SIZE + 1));
 		mTorrentTempFile.read(tempHashChunkData, CHUNK_SIZE);
 
 		tempTorrentFileHash = string(tempHashChunkData);
@@ -806,6 +811,9 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 			close(sock);
 			return false;
 		}
+
+		free(responseStub);
+		free(tempHashChunkData);
 
 	} while (responseStatus > 0);
 
