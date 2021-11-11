@@ -396,6 +396,7 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
 
+    close(seederSocket);
     seederFile.close();
 }
 
@@ -486,6 +487,7 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
 
+    close(seederSocket);
     seederFile.close();
 }
 
@@ -525,6 +527,7 @@ void sendHashFileData(string filename, int new_socket) {
 		
 		totalSize = totalSize - currChunkSize;
 		hashNo++;
+		cout << "hash for chunk no " << hashNo << endl;
     }
 
 	mTorrentFile.close();
@@ -657,6 +660,33 @@ void seederService(pair<string, int> myIpAddress) {
  										(void *)&new_socket);
  			
  			sendFileContentThread.detach();
+
+ 			cout << "rebuilding socket connection" << endl;
+ 			if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) { 
+		        perror("socket failed"); 
+		        exit(EXIT_FAILURE); 
+		    }
+
+		    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) { 
+		        perror("setsockopt"); 
+		        exit(EXIT_FAILURE); 
+		    }
+
+		    address.sin_family = AF_INET; 
+		    address.sin_addr.s_addr = inet_addr(myIpAddress.first.c_str()); 
+		    address.sin_port = htons(myIpAddress.second);
+
+		    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0) { 
+		        perror("bind failed"); 
+		        exit(EXIT_FAILURE);
+		    }
+
+		    if (listen(server_fd, 3) < 0) { 
+		        perror("listen"); 
+		        exit(EXIT_FAILURE); 
+		    }
+
+		    continue;
  		} else if (tokens[0] == "new_file_hash") {
  			if(tokens[4] != loggedInUuid) {
  				sendSeederOfflineMessageToClient(new_socket);
