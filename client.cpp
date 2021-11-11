@@ -406,9 +406,9 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     sem_post(&shareListSeederMutex);
 
     string pauseDownload = "$PaUsE$";
-	char *pauseDownloadSignal = new char[pauseDownload.length() + 1];
+	char *pauseDownloadSignal = new char[CHUNK_SIZE + 1];
 	strcpy(pauseDownloadSignal, pauseDownload.c_str());
-	send(seederSocket, pauseDownloadSignal, strlen(pauseDownloadSignal), 0);
+	send(seederSocket, pauseDownloadSignal, CHUNK_SIZE, 0);
 
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
@@ -494,9 +494,9 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     	cout << "Download complete" << endl;
 
     	string pauseDownload = "$cOmPlEtE$";
-		char *pauseDownloadSignal = new char[pauseDownload.length() + 1];
+		char *pauseDownloadSignal = new char[CHUNK_SIZE + 1];
 		strcpy(pauseDownloadSignal, pauseDownload.c_str());
-		send(seederSocket, pauseDownloadSignal, strlen(pauseDownloadSignal), 0);
+		send(seederSocket, pauseDownloadSignal, CHUNK_SIZE, 0);
     	shareEntity.setStatus(1);
     	seederFile.close();
     	return;
@@ -991,10 +991,15 @@ void writeSeederFileData(string ipAddress, string port, string request,
         destFile.write(buffer, n);
         numOfChunksReceived++;
 
-        if(strcmp(buffer, "$cOmPlEtE$") == 0 || strcmp(buffer, "$PaUsE$") == 0) {
-        	cout << "received complete/pause signal from seeder" << endl; 
+        if(strcmp(buffer, "$cOmPlEtE$") == 0) { 
+        	cout << "received pause signal from seeder" << endl; 
         	break;
         }
+
+     	if(strcmp(buffer, "$PaUsE$") == 0) {
+     		cout << "received pause signal from seeder" << endl; 
+        	break;
+     	}
         cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
     } while (n > 0);
 
@@ -1107,8 +1112,8 @@ void initializeDownload(string uuid, string ipAddress, string port,
 						totalFileSize, numOfChunksToReceive, uuid, 
 						filename, groupId, downloadId);
 
-	cout << "creating temp mtorrent file" << endl;
-	createMTorrentFileOfTempFile(tempFilename);
+	// cout << "creating temp mtorrent file" << endl;
+	// createMTorrentFileOfTempFile(tempFilename);
 	
 	request = "new_file_hash";
 	request += "$" + filename + "$" + groupId + "$" + downloadId + "$" + uuid;
