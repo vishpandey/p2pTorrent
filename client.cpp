@@ -396,7 +396,6 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
 
-    close(seederSocket);
     seederFile.close();
 }
 
@@ -487,7 +486,6 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
 
-    close(seederSocket);
     seederFile.close();
 }
 
@@ -530,7 +528,6 @@ void sendHashFileData(string filename, int new_socket) {
     }
 
 	mTorrentFile.close();
-	close(new_socket);
 }
 
 void sendSeederOfflineMessageToClient(int new_socket) {
