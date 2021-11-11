@@ -323,7 +323,6 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
 	//cout << "intializing file transfer process" << endl;
 	
 	string filePath = "uploads/" + filename;
-	string mTorrentFilename = filename + ".mtorrent";
 	int seederSocket = *(int *)new_socket;
 	
 	struct stat seedFileStat;
@@ -387,7 +386,7 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     if(totalSize <= 0) {
     	cout << "Download complete" << endl;
     	
-    	string completeDownload = "$complete$";
+    	string completeDownload = "$cOmPlEtE$";
     	char *completeDownloadSignal = new char[completeDownload.length() + 1];
 		strcpy(completeDownloadSignal, completeDownload.c_str());
 		cout << "sending complete download signal" << endl;
@@ -767,6 +766,7 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
     // stat(filepath.c_str(), &fileStat);
     long long int hashno = 0;
 
+    tempFilePath += ".mtorrent"; 
     ifstream mTorrentTempFile(tempFilePath.c_str(), ifstream::binary);
 
 	do {
@@ -969,7 +969,7 @@ void writeSeederFileData(string ipAddress, string port, string request,
         destFile.write(buffer, n);
         numOfChunksReceived++;
 
-        if(strcmp(buffer, "$complete$") || strcmp(buffer, "$pause$")) {
+        if(strcmp(buffer, "$cOmPlEtE$") == 0 || strcmp(buffer, "$PaUsE$") == 0) {
         	cout << "received complete/pause signal from seeder" << endl; 
         	break;
         }
