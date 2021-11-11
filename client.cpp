@@ -384,19 +384,32 @@ void sendFileContent(string filename, string groupId, string shareId, void *new_
     auto shareEntityIter = shareListSeeder.find(shareId);
     Shares shareEntity = shareEntityIter->second;
     shareEntity.setChunksAlreadySent(chunksAlreadySent);
-    shareEntityIter->second = shareEntity;
-    sem_post(&shareListSeederMutex);
     if(totalSize <= 0) {
     	cout << "Download complete" << endl;
+    	
+    	string completeDownload = "$complete$";
+    	char *completeDownloadSignal = new char[completeDownload.length() + 1];
+		strcpy(completeDownloadSignal, completeDownload.c_str());
+		cout << "sending complete download signal" << endl;
+    	send(seederSocket, completeDownloadSignal, strlen(completeDownloadSignal), 0);
+    	
     	shareEntity.setStatus(1);
-    	close(seederSocket);
+    	shareEntityIter->second = shareEntity;
+    	sem_post(&shareListSeederMutex);
     	seederFile.close();
     	return;
     }
+
+    shareEntityIter->second = shareEntity;
+    sem_post(&shareListSeederMutex);
+
+    string pauseDownload = "$pause$";
+	char *pauseDownloadSignal = new char[pauseDownload.length() + 1];
+	strcpy(pauseDownloadSignal, pauseDownload.c_str());
+	send(seederSocket, pauseDownloadSignal, strlen(pauseDownloadSignal), 0);
+
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
-
-    close(seederSocket);
     seederFile.close();
 }
 
@@ -480,14 +493,11 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
     if(totalSize <= 0) {
     	cout << "Download complete" << endl;
     	shareEntity.setStatus(1);
-    	close(seederSocket);
     	seederFile.close();
     	return;
     }
     cout << "total Size is not 0, download stopped" << endl;
     cout << "stopping download" << endl;
-
-    close(seederSocket);
     seederFile.close();
 }
 
@@ -660,33 +670,6 @@ void seederService(pair<string, int> myIpAddress) {
  										(void *)&new_socket);
  			
  			sendFileContentThread.detach();
-
- 			cout << "rebuilding socket connection" << endl;
- 			if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) { 
-		        perror("socket failed"); 
-		        exit(EXIT_FAILURE); 
-		    }
-
-		    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) { 
-		        perror("setsockopt"); 
-		        exit(EXIT_FAILURE); 
-		    }
-
-		    address.sin_family = AF_INET; 
-		    address.sin_addr.s_addr = inet_addr(myIpAddress.first.c_str()); 
-		    address.sin_port = htons(myIpAddress.second);
-
-		    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0) { 
-		        perror("bind failed"); 
-		        exit(EXIT_FAILURE);
-		    }
-
-		    if (listen(server_fd, 3) < 0) { 
-		        perror("listen"); 
-		        exit(EXIT_FAILURE); 
-		    }
-
-		    continue;
  		} else if (tokens[0] == "new_file_hash") {
  			if(tokens[4] != loggedInUuid) {
  				sendSeederOfflineMessageToClient(new_socket);
@@ -985,6 +968,11 @@ void writeSeederFileData(string ipAddress, string port, string request,
         n = read(sock, buffer, CHUNK_SIZE);
         destFile.write(buffer, n);
         numOfChunksReceived++;
+
+        if(strcmp(buffer, "$complete$") || strcmp(buffer, "$pause$")) {
+        	cout << "received complete/pause signal from seeder" << endl; 
+        	break;
+        }
         //cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
     } while (n > 0);
 
