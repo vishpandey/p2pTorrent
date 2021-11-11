@@ -492,7 +492,7 @@ void reSendFileContent(string filename, string groupId, string shareId, void *ne
 }
 
 void sendHashFileData(string filename, int new_socket) {
-	//cout << "retrieving hash of file" << endl;
+	cout << "sending hash of file" << endl;
 
 	string mTorrentFilename = "uploads/" + filename + ".mtorrent";
 
@@ -508,7 +508,7 @@ void sendHashFileData(string filename, int new_socket) {
     ifstream mTorrentFile(fpath, ifstream::binary);
 
     string line;
-    int lineNum = 0;
+    long long int hashNo = 0;
     string fileHash = "";
 
     long long int totalSize = torrentFileStat.st_size;
@@ -526,6 +526,7 @@ void sendHashFileData(string filename, int new_socket) {
 		send(new_socket, chunkData, currChunkSize, 0);
 		
 		totalSize = totalSize - currChunkSize;
+		hashNo++;
     }
 
 	mTorrentFile.close();
@@ -754,6 +755,7 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 
     // struct stat fileStat;
     // stat(filepath.c_str(), &fileStat);
+    long long int hashno = 0;
 
     ifstream mTorrentTempFile(tempFilePath.c_str(), ifstream::binary);
 
@@ -761,6 +763,9 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 		char *responseStub = new char[CHUNK_SIZE];
 		
 		responseStatus = read(sock , responseStub, CHUNK_SIZE);
+		
+		hashno++;
+		cout << "received hash no " << hashno << endl;
 		
 		seederFileHashFromServer = string(responseStub);
 
@@ -773,6 +778,8 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 			cout << "actual hash: " << tempTorrentFileHash << endl;
 			cout << "expected hash : " << seederFileHashFromServer << endl;
 			cout << "hash of chunk did not match" << endl;
+			srcFd.close();
+			close(sock);
 			return false;
 		}
 
