@@ -542,10 +542,10 @@ void sendHashFileData(string filename, int new_socket) {
     while(totalSize > 0) {
     	currChunkSize = CHUNK_SIZE;
     	if(totalSize < CHUNK_SIZE) {
-    		currChunkSize = totalSize;	
+    		currChunkSize = totalSize;
     	}
 
-    	chunkData = (char *)malloc( sizeof(char) * (currChunkSize + 1));
+    	chunkData = (char *)malloc( sizeof(char) * (currChunkSize));
 		mTorrentFile.read(chunkData, currChunkSize);
 
 		send(new_socket, chunkData, currChunkSize, 0);
@@ -789,7 +789,7 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
     char *responseStub, *tempHashChunkData;
 
 	do {
-		responseStub = (char *)malloc( sizeof(char) * (CHUNK_SIZE + 1));
+		responseStub = (char *)malloc( sizeof(char) * (CHUNK_SIZE));
 		
 		responseStatus = read(sock , responseStub, CHUNK_SIZE);
 		
@@ -798,15 +798,15 @@ bool fetchHashValueFromSeeder(string ipAddress, string port, string request,
 		
 		seederFileHashFromServer = string(responseStub);
 
-		tempHashChunkData = (char *)malloc( sizeof(char) * (CHUNK_SIZE + 1));
-		mTorrentTempFile.read(tempHashChunkData, CHUNK_SIZE);
+		tempHashChunkData = (char *)malloc( sizeof(char) * (CHUNK_SIZE / 8));
+		mTorrentTempFile.read(tempHashChunkData, CHUNK_SIZE / 8);
 
 		tempTorrentFileHash = string(tempHashChunkData);
 
 		if(tempTorrentFileHash != seederFileHashFromServer) {
-			cout << "actual hash: " << tempTorrentFileHash << endl;
-			cout << "expected hash : " << seederFileHashFromServer << endl;
-			cout << "hash of chunk did not match" << endl;
+			//cout << "actual hash: " << tempTorrentFileHash << endl;
+			//cout << "expected hash : " << seederFileHashFromServer << endl;
+			cout << "hash of chunks " << hashno <<  " did not match" << endl;
 			srcFd.close();
 			close(sock);
 			return false;
@@ -995,7 +995,7 @@ void writeSeederFileData(string ipAddress, string port, string request,
         	cout << "received complete/pause signal from seeder" << endl; 
         	break;
         }
-        //cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
+        cout << "chunk no:" << numOfChunksReceived << " received" <<endl; 
     } while (n > 0);
 
     cout << "numOfChunksReceived : " << numOfChunksReceived << endl;
@@ -1112,8 +1112,10 @@ void initializeDownload(string uuid, string ipAddress, string port,
 	
 	request = "new_file_hash";
 	request += "$" + filename + "$" + groupId + "$" + downloadId + "$" + uuid;
-	bool fileHashVerificationStatus = fetchHashValueFromSeeder(ipAddress, port, request, 
-																tempFilename);
+	//bool fileHashVerificationStatus = fetchHashValueFromSeeder(ipAddress, port, request, 
+	//															tempFilename);
+	
+	bool fileHashVerificationStatus = true;
 	cout << "received file hash details" << endl;
 
 	if (fileHashVerificationStatus) {
